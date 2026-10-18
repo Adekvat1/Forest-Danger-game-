@@ -1,7 +1,5 @@
-import random, os, time, json, math
-from colorama import Fore, Style
-import Classes
-import text_data
+import random, os, json
+import Classes, text_data
 from items_data import all_items
 
 player = Classes.Player(name="You", atk=10, max_hp=100, stm=100)
@@ -26,22 +24,15 @@ def save_data(data):
 def update_info(player, game):
     text = game.update_text(player)
     if game.show_info:
-        text['heal'] = text['heal'] + text['help']
         text['level_up_buy'] = text['level_up_buy'] + text['help']
     return text
 
 def attack(player, enemy):
-    damage = (enemy.atk / 100) * (100 - player.arm)
+    damage = int(enemy.atk / 100) * (100 - player.arm)
     effect(damage, player.atk, player.inv)
-    player.hp -= int(damage)
+    player.hp -= damage
     enemy.hp -= player.atk
     return player.hp, enemy.hp
-
-def get_bar(current, maximum, length=20):
-    if maximum == 0: return "[]"
-    filled = int((current / maximum) * length)
-    filled = min(filled, length)
-    return f"[{Fore.GREEN}{('#' * filled)}{Fore.BLACK}{'_' * (length - filled)}{Style.RESET_ALL}] ({Fore.LIGHTBLACK_EX}{current}/{maximum}{Style.RESET_ALL})"
 
 def get_win(player, enemy):
     if player.hp <= 0:
@@ -93,14 +84,16 @@ def main():
 
             choice = input(text["atk"] if game.show_info else "")
 
-            if choice == "":
+            if choice == "": # Enter
                 player.stm -= 5
                 player.hp, current_enemy.hp = attack(player=player, enemy=current_enemy)
                 state = get_win(player, current_enemy)
                 if state:
+
                     if state == 1:
                         text_data.game_over_screen(player, player_stats, save_data)
                         break
+
                     else: # get_win() == 2
                         player.exp += current_enemy.exp
                         player.score += current_enemy.exp
@@ -110,15 +103,18 @@ def main():
                         print(text_data.get_current_stats(player, game))
                         text_data.string_shreder(text="You win!", peak_spaces=5, delay=0.07)
                         break
+
                 else: # get_win() == 0
                     continue
-            else:
+            else: # anything except Enter
                 player.stm -= 25
                 break
 
         if game.easy_mode:
-            player.hp += 10
-            player.stm += 10
+            if player.hp < player.hp // 2:
+                player.hp += 10
+            if player.stm < player.stm // 2:
+                player.stm += 10
         player.min_max()
         state = get_win(player, current_enemy)
         if state == 1:
@@ -126,40 +122,36 @@ def main():
             break
 
         text = update_info(player, game)
-
-        if player.exp >= player.exp_to_next_level:
-            clear()
-            print(text_data.get_current_stats(player, game))
-            print(text["level_up_buy"])
-            choice = input()
-            if choice != "":
-                player.level_up(game)
-                game.difficulty_up(all_items, player)
-                clear()
-                print(text_data.get_current_stats(player, game))
-                print(text["level_up"])
+        player.try_lvlup(game, all_items, text)
 
         if player.exp > 0:
+            current_page = 0
             while True: # marketplace cycle
-                choice, items, page = text_data.marketplace(all_items, player, game)
+                choice, current_page, pages, items = text_data.marketplace(all_items, player, game, current_page)
 
-                if choice == "":
-                    break
-                elif choice.lower() == "z":
-                    page -= 1
-                    if page <= 0:
-                        page = 1
-                elif choice.lower() == "x":
-                    page += 1
-                else:
+                try:
                     choice = int(choice)
+                except:
+                    choice = str(choice)
+
+                if type(choice) == str:
+                    choice = choice.lower()
+                    if choice == "":
+                        break
+                    elif choice in ["z", "я"]:
+                        current_page -= 1
+                        if current_page < 0:
+                            current_page = len(pages) - 1
+                    elif choice in ["x", "ч"]:
+                        current_page += 1
+                        if current_page > len(pages) - 1:
+                            current_page = 0
+                elif type(choice) == int:
                     for i in range(len(items)):
-                        if i + 1 == choice:
-                            if player.exp >= items[i].meta["cost"]:
+                        if choice - 1 == i:
+                            if items[i].meta["cost"] < player.exp:
                                 items[i].activate_item(player)
-                                items[i].meta["count"] -= 1
-                                player.min_max()
-                                break
+                player.min_max()
 
 if __name__ == "__main__":
     clear()

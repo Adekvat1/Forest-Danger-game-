@@ -1,6 +1,5 @@
-import time, os
+import time, os, math
 from colorama import Fore, Style
-from game import get_bar
 
 def clear(): os.system('cls') if os.name == 'nt' else os.system('clear')
 
@@ -21,6 +20,12 @@ def game_over_screen(player, player_stats, save_data):
     player.reset()
     input()
     clear()
+
+def get_bar(current, maximum, length=20):
+    if maximum == 0: return "[]"
+    filled = int((current / maximum) * length)
+    filled = min(filled, length)
+    return f"[{Fore.GREEN}{('#' * filled)}{Fore.BLACK}{'_' * (length - filled)}{Style.RESET_ALL}] ({Fore.LIGHTBLACK_EX}{current}/{maximum}{Style.RESET_ALL})"
 
 def update_data(player, data):
     if data["max_exp"] < player.score:
@@ -76,32 +81,52 @@ def get_items_visuals(items, player):
         )
     return items
 
-def marketplace(all_items, player, game, page=1):
-    items = get_allowed_items(all_items, player)
+def get_pages(items, player, item_per_page=2):
     items = get_items_visuals(items, player)
-    num_items = len(items)
-    item_per_page = 3
+    step = 1
+    page = []
+    pages = []
+    for i in range(len(items)):
+        if step == item_per_page:
+            step = 0
+            page.append(items[i])
+            pages.append(page)
+            page = []
+        else:
+            page.append(items[i])
+        step += 1
+    return pages
+
+def marketplace(all_items, player, game, page=0):
+    items = get_allowed_items(all_items, player)
 
     clear()
-    print(get_current_stats(player, game) + "\n\n~-~-~ Магазин предметов ~-~-~")
-    step = 0
-    for _ in range(item_per_page):
-        step += 1
-    for i in range(len(items)):
-        if i < 4:
-            print(items[i].meta["buy_word"])
-        else:
-            print(f"\n~-~-~ <- [Z] {page}/{num_items // item_per_page} [X] -> ~-~-~")
+    print(
+        get_current_stats(player, game) + "\n",
+        "\n" + "~-~-~ Магазин предметов ~-~-~"
+        )
+
+    pages = get_pages(items, player)
+
+    for i in range(len(pages)):
+        if i > len(pages):
             break
+        else:
+            for j in pages[i+page]:
+                print(j.meta["buy_word"])
+
+        print("\n" + f"~-~-~ <- [Z] {page+1}/{len(pages)} [X] -> ~-~-~")
+        break
+
     choice = input()
-    return choice, items, page
+    return choice, page, pages, items
 
 def get_current_stats(player, game):
     current_stats = f"""
 Ваша статистика{"" if game.easy_mode is False else " (Лёгкий режим активен)"}:
 HP:  {get_bar(player.hp, player.max_hp)}{"" if player.hp >= 30 else (Fore.RED + " WARN!!" + Style.RESET_ALL)}
 STM: {get_bar(player.stm, player.stm_max)}{"" if player.stm >= 25 else (Fore.RED + " WARN!!" + Style.RESET_ALL)}
-ATK: {get_bar(player.atk, player.max_hp)}
+ATK: {get_bar(player.atk, 100)}
 EXP: {get_bar(player.exp, player.exp_to_next_level)}
 ARM: {get_bar(player.arm, 50)}
 LVL: {player.level}"""
