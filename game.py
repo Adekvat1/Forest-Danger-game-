@@ -1,9 +1,16 @@
-import random, os, json
+import os, json, webbrowser
 import Classes, text_data
 from items_data import all_items
 
-player = Classes.Player(name="You", atk=10, max_hp=100, stm=100)
+player = Classes.Player(name="You", atk=10, hp=100, stm=100)
 game = Classes.Game()
+
+# --------- Not dynamic
+STM_PER_STEP = 7
+
+def my_ad(show_ad):
+    if show_ad:
+        webbrowser.open("https://www.youtube.com/watch?v=M6lF6hee_VA&t=1s")
 
 try:
     with open("stats.json", "r", encoding="UTF-8") as f:
@@ -15,24 +22,17 @@ except FileNotFoundError:
         "max_level": 0
     }
 
-def clear(): os.system('cls') if os.name == 'nt' else os.system('clear')
-
 def save_data(data):
     with open("stats.json", "w", encoding="UTF-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
+def clear(): os.system('cls') if os.name == 'nt' else os.system('clear')
 
 def update_info(player, game):
     text = game.update_text(player)
     if game.show_info:
         text['level_up_buy'] = text['level_up_buy'] + text['help']
     return text
-
-def attack(player, enemy):
-    damage = int(enemy.atk / 100) * (100 - player.arm)
-    effect(damage, player.atk, player.inv)
-    player.hp -= damage
-    enemy.hp -= player.atk
-    return player.hp, enemy.hp
 
 def get_win(player, enemy):
     if player.hp <= 0:
@@ -45,32 +45,11 @@ def get_win(player, enemy):
         elif enemy.hp > 0:
             return 0 # continue
 
-def generate_enemy(game):
-    names = [
-        "Zombie",
-        "Skeleton",
-        "Witch",
-        "Homeless dog",
-        "Spider"
-    ]
-    new_hp = random.randint(game.enemy_min_hp, game.enemy_max_hp)
-    new_atk = int(new_hp / 2)
-    new_exp = new_atk * 3
-
-    enemy = Classes.Enemy(random.choice(names), atk=new_atk, max_hp=new_hp, exp=new_exp)
-
-    return enemy
-
-def effect(damage, atk, inventory):
-    for item in inventory:
-        if item.meta["count"] > 0:
-            item.effect(damage, atk)
-
 def main():
     global player_stats
     while True: # main cycle
 
-        current_enemy = generate_enemy(game)
+        current_enemy = game.generate_enemy()
         text = update_info(player, game)
 
         while True: # attack cycle
@@ -85,20 +64,19 @@ def main():
             choice = input(text["atk"] if game.show_info else "")
 
             if choice == "": # Enter
-                player.stm -= 5
-                player.hp, current_enemy.hp = attack(player=player, enemy=current_enemy)
+                player.stm -= STM_PER_STEP
+                player.hp, current_enemy.hp = player.attack(current_enemy)
                 state = get_win(player, current_enemy)
                 if state:
 
                     if state == 1:
-                        text_data.game_over_screen(player, player_stats, save_data)
+                        text_data.game_over_screen(player, player_stats, save_data, game)
                         break
 
                     else: # get_win() == 2
                         player.exp += current_enemy.exp
                         player.score += current_enemy.exp
                         player.kills += 1
-                        current_enemy.set_max_stats()
                         clear()
                         print(text_data.get_current_stats(player, game))
                         text_data.string_shreder(text="You win!", peak_spaces=5, delay=0.07)
@@ -107,7 +85,6 @@ def main():
                 else: # get_win() == 0
                     continue
             else: # anything except Enter
-                player.stm -= 25
                 break
 
         if game.easy_mode:
@@ -124,33 +101,35 @@ def main():
         text = update_info(player, game)
         player.try_lvlup(game, all_items, text)
 
-        if player.exp > 0:
+        if player.exp > 0: # marketplace cycle
             current_page = 0
-            while True: # marketplace cycle
+            while True:
                 choice, current_page, pages, items = text_data.marketplace(all_items, player, game, current_page)
 
                 try:
                     choice = int(choice)
-                except:
+                except ValueError:
                     choice = str(choice)
 
                 if type(choice) == str:
                     choice = choice.lower()
-                    if choice == "":
+                    if choice == "": # exit
                         break
-                    elif choice in ["z", "я"]:
+                    elif choice in ["z", "я"]: # previous page
                         current_page -= 1
                         if current_page < 0:
                             current_page = len(pages) - 1
-                    elif choice in ["x", "ч"]:
+                    elif choice in ["x", "ч"]: # next page
                         current_page += 1
                         if current_page > len(pages) - 1:
                             current_page = 0
                 elif type(choice) == int:
                     for i in range(len(items)):
                         if choice - 1 == i:
-                            if items[i].meta["cost"] < player.exp:
+                            if items[i].meta["cost"] <= player.exp:
                                 items[i].activate_item(player)
+                                if current_page > 0: current_page -= 1
+
                 player.min_max()
 
 if __name__ == "__main__":
@@ -162,6 +141,9 @@ if __name__ == "__main__":
     choice = input("Чтобы включить Лёгкий Режим, нажмите Space + Enter. Для пропуска Enter.")
     if choice == "": game.easy_mode = False
     else: game.easy_mode = True
+    clear()
+    choice = input("Чтобы посмотреть обзор на ютубе, нажмите Space + Enter. Для пропуска Enter.")
+    my_ad(choice)
     clear()
     text = update_info(player, game)
     main()

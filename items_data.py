@@ -2,8 +2,15 @@ from Classes import Items
 
 placeholder = "\n{}. {} {}\nСтоимость: {}EXP\nДаёт +{} к "
 
+def check(player, item):
+    stats = player.get_stats()
+    if stats[item.meta["type"]] >= stats["max_" + item.meta["type"]]:
+        return False
+    else: return True
+
 def pay(player, item):
-    player.exp -= item.meta["cost"]
+    if check(player, item):
+        player.exp -= item.meta["cost"]
     return player
 
 def medkit_func(player, medkit):
@@ -29,6 +36,11 @@ def sword_func(player, sword):
 def iron_chestplate_func(player, iron_chestplate):
     player = pay(player, iron_chestplate)
     player.arm += iron_chestplate.meta["addition"]
+    return player
+
+def test_item_func(player, test_item):
+    player = pay(player, test_item)
+    player.hp += test_item.meta["addition"]
     return player
 
 medkit = Items(
@@ -92,7 +104,7 @@ atk_boost = Items(
     meta = {
         "cost": 100,
         "addition": 5,
-        "count": -1,
+        "count": 1,
         "type": "atk",
         "buy_word": placeholder + "ATK",
         "placeholder": placeholder + "ATK",
@@ -101,4 +113,18 @@ atk_boost = Items(
     link=atk_boost_func
 )
 
-all_items = [medkit, food, atk_boost, sword, iron_chestplate]
+test_item = Items(
+    name="Test Item",
+    meta = {
+        "cost": 1,
+        "addition": 1,
+        "count": 1,
+        "type": "hp",
+        "buy_word": placeholder + "HP",
+        "placeholder": placeholder + "HP",
+        "req": 1
+    },
+    link=test_item_func
+)
+
+all_items = [medkit, food, sword, iron_chestplate]

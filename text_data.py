@@ -1,9 +1,10 @@
-import time, os, math
+import time, os
 from colorama import Fore, Style
+import logics
 
 def clear(): os.system('cls') if os.name == 'nt' else os.system('clear')
 
-def game_over_screen(player, player_stats, save_data):
+def game_over_screen(player, player_stats, save_data, game):
     time.sleep(1)
     clear()
     print(
@@ -17,7 +18,7 @@ def game_over_screen(player, player_stats, save_data):
         "Нажмите Enter чтобы продолжить игру."
     )
     save_data(player_stats)
-    player.reset()
+    player.reset(game)
     input()
     clear()
 
@@ -49,14 +50,6 @@ def string_shreder(text, peak_spaces=5, delay=0.1):
         time.sleep(delay)
     print()
 
-def get_allowed_items(all_items, player):
-    items = []
-    for i in all_items:
-        if i.meta["count"] != 0 and i.meta["req"] <= player.level:
-            items.append(i)
-
-    return items
-
 def get_item_suffix(item, player):
     if player.exp < item.meta["cost"]:
         suffix = Fore.RED + "Not Enough Money" + Style.RESET_ALL
@@ -75,48 +68,25 @@ def get_items_visuals(items, player):
         item.meta["buy_word"] = item.meta["placeholder"].format(
             item_number,
             item.name,
-            ((" "*spaces_count)+suffix),
+            (" "*spaces_count)+suffix,
             item.meta["cost"],
             item.meta["addition"]
         )
     return items
 
-def get_pages(items, player, item_per_page=2):
-    items = get_items_visuals(items, player)
-    step = 1
-    page = []
-    pages = []
-    for i in range(len(items)):
-        if step == item_per_page:
-            step = 0
-            page.append(items[i])
-            pages.append(page)
-            page = []
-        else:
-            page.append(items[i])
-        step += 1
-    return pages
-
 def marketplace(all_items, player, game, page=0):
-    items = get_allowed_items(all_items, player)
-
+    items = logics.get_allowed_items(all_items, player)
+    items = get_items_visuals(items, player)
     clear()
     print(
         get_current_stats(player, game) + "\n",
         "\n" + "~-~-~ Магазин предметов ~-~-~"
         )
+    pages = logics.get_pages(items)
 
-    pages = get_pages(items, player)
-
-    for i in range(len(pages)):
-        if i > len(pages):
-            break
-        else:
-            for j in pages[i+page]:
-                print(j.meta["buy_word"])
-
-        print("\n" + f"~-~-~ <- [Z] {page+1}/{len(pages)} [X] -> ~-~-~")
-        break
+    for i in pages[page]:
+        print(i.meta["buy_word"])
+    print("\n" + f"~-~-~ <- [Z] {page+1}/{len(pages)} [X] -> ~-~-~")
 
     choice = input()
     return choice, page, pages, items
@@ -125,7 +95,7 @@ def get_current_stats(player, game):
     current_stats = f"""
 Ваша статистика{"" if game.easy_mode is False else " (Лёгкий режим активен)"}:
 HP:  {get_bar(player.hp, player.max_hp)}{"" if player.hp >= 30 else (Fore.RED + " WARN!!" + Style.RESET_ALL)}
-STM: {get_bar(player.stm, player.stm_max)}{"" if player.stm >= 25 else (Fore.RED + " WARN!!" + Style.RESET_ALL)}
+STM: {get_bar(player.stm, player.max_stm)}{"" if player.stm >= 25 else (Fore.RED + " WARN!!" + Style.RESET_ALL)}
 ATK: {get_bar(player.atk, 100)}
 EXP: {get_bar(player.exp, player.exp_to_next_level)}
 ARM: {get_bar(player.arm, 50)}
@@ -133,10 +103,11 @@ LVL: {player.level}"""
     return current_stats
 
 def get_current_enemy(enemy):
-    current_enemy = f"""
+    enemy_stats = f"""
 Текущий враг:
 NAME: {Fore.RED}{enemy.name}{Style.RESET_ALL}
 HP:  {get_bar(enemy.hp, enemy.max_hp)}
-ATK: {get_bar(enemy.atk, 100, length=20)}
-EXP: {get_bar(enemy.exp, 100, length=20)}"""
-    return current_enemy
+ATK: {get_bar(enemy.atk, 100)}
+ARM: {get_bar(enemy.arm, enemy.max_arm)}
+EXP: {get_bar(enemy.exp, 100)}"""
+    return enemy_stats
